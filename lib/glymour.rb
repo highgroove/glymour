@@ -8,12 +8,12 @@ module Glymour
       def power_set!
         return [[]] if empty?
         f = shift
-        rec = self.power_set!
+        rec = power_set!
         rec + rec.map {|i| [f] + i }
       end
 
       def power_set
-        return self.clone.power_set!
+        return clone.power_set!
       end
     end
 
@@ -21,7 +21,7 @@ module Glymour
       # Returns a (unique) list of vertices adjacent to vertex a or b.
       # This is denoted "Aab" in Spirtes-Glymour's paper.
       def adjacent_either(a, b)
-        (self.adjacent_vertices(a) + self.adjacent_vertices(b)).uniq
+        (adjacent_vertices(a) + adjacent_vertices(b)).uniq
       end
 
       # Returns an array of all vertices on undirected simple paths between s and t.
@@ -31,7 +31,7 @@ module Glymour
         if current_vertex == t
           paths << current_path + [current_vertex]
         else
-          self.adjacent_vertices(current_vertex).each do |v|
+          adjacent_vertices(current_vertex).each do |v|
             # Don't recur if we're repeating vertices (i.e. reject non-simple paths)
             verts_on_paths(v, t, current_path + [current_vertex], paths) if current_path.count(current_vertex) == 0
           end
@@ -45,15 +45,15 @@ module Glymour
       def non_transitive
         non_transitive_verts = []
 
-        self.vertices.each do |u|
-          self.adjacent_vertices(u).each do |v|
-            self.adjacent_vertices(v).each do |w|
+        vertices.each do |u|
+          adjacent_vertices(u).each do |v|
+            adjacent_vertices(v).each do |w|
               non_transitive_verts << [u, v, w]
             end
           end
         end
         non_transitive_verts.reject do |triple|
-          self.adjacent_vertices(triple.first).include? triple.last
+          adjacent_vertices(triple.first).include? triple.last
         end
       end
     end
@@ -115,11 +115,11 @@ module Glymour
 
       # Perform the PC algorithm in full
       def learn_structure
-        # Perform self.step until every pair of adjacent variables is dependent, and
+        # Perform step until every pair of adjacent variables is dependent, and
         # set final_net to the _second-to-last_ state of @net
         begin
           final_net = @net
-        end while self.step
+        end while step
 
         # Direct remaining edges in @net as much as possible
         final_net.non_transitive.each do |triple|
@@ -174,11 +174,11 @@ module Glymour
       vars = {}
       return_net = Sbn::Net.new(title)
       
-      self.vertices.each do |v|
+      vertices.each do |v|
         vars[v] = Sbn::Variable.new(return_net, v.to_sym)
       end
       
-      self.edges.each do |e|
+      edges.each do |e|
         vars[e.source].add_child(vars[e.target])
       end
       
@@ -187,37 +187,33 @@ module Glymour
   end
   
   module Statistics
+    require 'Rinruby'
     # Grabs variable data from a table (mostly for quantizing continous vars)
-    # block is a Proc that determines the variable value for a given row of table
-    # e.g. { |row| row[:first_seen_at] }
+    # block determines the variable value for a given row of table, e.g. { |row| row[:first_seen_at] } or &:first_seen_at
     class Variable
-      attr_accessor :intervals, :table, :block
+      attr_accessor :intervals, :table
       
       def initialize(table, num_classes=nil, &block)
         @table = table
         @block = Proc.new &block
-        @intervals = num_classes.nil? ? self.to_intervals(num_classes) : nil
+        @intervals = num_classes ? to_intervals(num_classes) : nil
       end
       
       # Apply @block to each column value, and 
       # return a list of evenly divided intervals [x1, x2, ..., x(n_classes)]
       # So that x1 is the minimum, xn is the max
       def to_intervals(num_classes)
-        step = (self.values.max - self.values.min)/(num_classes-1).to_f
-        (0..(num_classes-1)).map { |k| self.values.min + k*step }
+        step = (values.max - values.min)/(num_classes-1).to_f
+        (0..(num_classes-1)).map { |k| values.min + k*step }
+      end
+      
+      def value_at(row)
+        @block.call(row)
       end
       
       def values
-        @table.all.map(&@block)
+        @table.map(&@block)
       end
-    end
-    
-    # Accepts a hash of Variable => value pairs and generates a learning row for a net
-    def learning_row(var_values)
-      @var_values = var_values
-      
-      # Find quantized state of variable values
-      @var_values.keys.each { |v| @var_values[v] = location_in_interval(@var_values[v], v.to_interval) unless v.intervals.nil? }
     end
     
     # Gives the location of a column value within a finite set of interval values (i.e. gives discrete state after classing a continuous variable)
@@ -230,30 +226,50 @@ module Glymour
       return -1
     end
     
-    # Generates a contingency table from an array of [x, y] pairs
-    def contingency_table(value_pairs)
-      row_states = value_pairs.map(&:first).uniq
-      col_states = value_pairs.map(&:last).uniq
-
-      table = col_states.map do |y|
-        row_states.map do |x|
-          value_pairs.select { |pair| pair == [x, y] }.length
+    # Accepts a list of variables and a row of data and generates a learning row for a net
+    def learning_row(variables, row)
+      var_values = {}
+      
+      variables.each do |var|
+        if var.intervals
+          var_values[var] = location_in_interval(var.value_at row)
+        else
+          var_values[var] = var.value_at row
         end
       end
-
-      "matrix(c(#{table.join ', '}), #{row_states.length}, #{col_states.length})"
+      
+      var_values
+    end
+    
+    # Generates a contingency table for two variables from a learning row generated above
+    def contingency_table(var1, var2, rows)
+      values_table = rows.map { |row| learning_row([var1, var2], row) }      
+      
+      row_states = values_table.map { |entry| entry[var1] }.uniq
+      col_states = values_table.map { |entry| entry[var2] }.uniq
+      
+      matrix = []
+      row_states.each do |row_state|
+        col_states.each do |col_state|
+          matrix << values_table.select { |val_pair| val_pair[var1] == row_state and val_pair[var2] == col_state }.length
+        end
+      end
+      
+      "matrix(c(#{matrix.join ', '}), #{row_states.length}, #{col_states.length})"
     end
     
     # Takes two variables and an array of conditioning variables
     # Returns true if x and y are coindependent given conditioned_on
-    def coindependent?(x, y, conditioned_on)
-      #TODO: Raise an exception if x and y have different tables
-      
-      value_pairs = x.values.zip y.values
-      
+    def coindependent?(var1, var2, conditioned_on=[])
+      #TODO: Raise an exception if var1 and var2 have different tables?
+      rows = var1.values
       R.eval <<-EOF
-        t <- coindep_test()
+        t <- coindep_test(#{contingency_table(var1, var2, rows)})
       EOF
     end
+  end
+  
+  module Correlator
+    
   end
 end
