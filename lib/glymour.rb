@@ -196,7 +196,11 @@ module Glymour
       def initialize(table, num_classes=nil, &block)
         @table = table
         @block = Proc.new &block
+<<<<<<< HEAD
         @intervals = num_classes ? to_intervals(num_classes) : nil
+=======
+        @intervals = num_classes.nil? ? to_intervals(num_classes) : nil
+>>>>>>> bca761c6d2bc0298ea71ac2d17f40d0d12761e86
       end
       
       # Apply @block to each column value, and 
@@ -205,15 +209,25 @@ module Glymour
       def to_intervals(num_classes)
         step = (values.max - values.min)/(num_classes-1).to_f
         (0..(num_classes-1)).map { |k| values.min + k*step }
+<<<<<<< HEAD
+=======
+      end
+      
+      def value_at(row)
+        @block.call(row)
+>>>>>>> bca761c6d2bc0298ea71ac2d17f40d0d12761e86
       end
       
       def value_at(row)
         @block.call(row)
       end
+<<<<<<< HEAD
       
       def values
         @table.map(&@block)
       end
+=======
+>>>>>>> bca761c6d2bc0298ea71ac2d17f40d0d12761e86
     end
     
     # Gives the location of a column value within a finite set of interval values (i.e. gives discrete state after classing a continuous variable)
@@ -239,6 +253,23 @@ module Glymour
       end
       
       var_values
+<<<<<<< HEAD
+=======
+    end
+    
+    # Generates a contingency table for two variables from a learning row generated above
+    def contingency_table(var1, var2, rows)
+      values_table = []
+      rows.each do |row|
+        values_table << learning_row([var1, var2], row)
+      end
+      
+      table = value_pairs.uniq.map do |(x, y)|
+        value_pairs.select { |pair| pair == [x, y] }.length
+      end
+
+      "matrix(c(#{table.join ', '}), #{value_pairs.length}, #{value_pairs.length})"
+>>>>>>> bca761c6d2bc0298ea71ac2d17f40d0d12761e86
     end
     
     # Generates a contingency table for two variables from a learning row generated above
