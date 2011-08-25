@@ -7,7 +7,7 @@ module Glymour
       # Sets an array to its "power array" (array of subarrays)
       def power_set!
         return [[]] if empty?
-        f = self.shift
+        f = shift
         rec = self.power_set!
         rec + rec.map {|i| [f] + i }
       end
@@ -33,15 +33,15 @@ module Glymour
         else
           self.adjacent_vertices(current_vertex).each do |v|
             # Don't recur if we're repeating vertices (i.e. reject non-simple paths)
-            verts_on_paths(v, t, current_path + [current_vertex]) if current_path.count(current_vertex) == 0
+            verts_on_paths(v, t, current_path + [current_vertex], paths) if current_path.count(current_vertex) == 0
           end
         end
+        
         paths.flatten.uniq
       end
 
       # Returns a list of _ordered_ 3-tuples (a, b, c) of vertices such that
       # (a, b) are adjacent and (b,c) are adjacent, but (a,c) are not.
-      # Triples are ordered, so if [x, y, z] is returned then so is [z, y, x]
       def non_transitive
         non_transitive_verts = []
 
@@ -53,7 +53,7 @@ module Glymour
           end
         end
         non_transitive_verts.reject do |triple|
-          triple.first.adjacent_vertices.include? triple.last
+          self.adjacent_vertices(triple.first).include? triple.last
         end
       end
     end
@@ -61,7 +61,7 @@ module Glymour
     # Generates the complete graph on n vertices if n is an integer, otherwise
     # the complete graph on the vertices in the enumerable given
     def complete_graph(n)
-      set = n.integer? ? (1..n) : n
+      set = (n.class == 'Integer' || n.class == 'Fixnum') ? (1..n) : n
       RGL::ImplicitGraph.new do |g|
         g.vertex_iterator { |b| set.each(&b) }
         g.adjacent_iterator do |x, b|
@@ -73,6 +73,7 @@ module Glymour
     # Takes a list of vertices and a hash of source => [targets] pairs and generates a directed graph
     def make_directed(vertices, directed_edges)
       RGL::ImplicitGraph.new do |g|
+        directed_edges.default = []
         g.vertex_iterator { |b| vertices.each(&b) }
         g.adjacent_iterator do |x, b|
           vertices.each {|y| b.call(y) if directed_edges[x].include? y}
@@ -250,7 +251,7 @@ module Glymour
       
       value_pairs = x.values.zip y.values
       
-      R.eval <<EOF
+      R.eval <<-EOF
         t <- coindep_test()
       EOF
     end
