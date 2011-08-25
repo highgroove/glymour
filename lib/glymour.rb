@@ -1,4 +1,4 @@
-require "glymour/version"
+require "glymour"
 
 module Glymour
   # Provides graph structures and algorithms for determining edge structure of a Bayesian net
@@ -187,7 +187,6 @@ module Glymour
   end
   
   module Statistics
-    require 'Rinruby'
     # Grabs variable data from a table (mostly for quantizing continous vars)
     # block determines the variable value for a given row of table, e.g. { |row| row[:first_seen_at] } or &:first_seen_at
     class Variable
@@ -248,9 +247,10 @@ module Glymour
       row_states = values_table.map { |entry| entry[var1] }.uniq
       col_states = values_table.map { |entry| entry[var2] }.uniq
       
+      # R turns lists into matrices by moving up-down, then left-right (i.e. finish a column and move to the next)
       matrix = []
-      row_states.each do |row_state|
-        col_states.each do |col_state|
+      col_states.each do |col_state|
+        row_states.each do |row_state|
           matrix << values_table.select { |val_pair| val_pair[var1] == row_state and val_pair[var2] == col_state }.length
         end
       end
