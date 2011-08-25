@@ -231,7 +231,7 @@ module Glymour
       
       variables.each do |var|
         if var.intervals
-          var_values[var] = location_in_interval(var.value_at row)
+          var_values[var] = location_in_interval(var.value_at(row), var.intervals)
         else
           var_values[var] = var.value_at row
         end
