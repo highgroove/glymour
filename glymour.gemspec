@@ -15,7 +15,7 @@ Gem::Specification.new do |s|
   
   s.add_dependency 'rgl'
   s.add_dependency 'sbn'
-  s.add_dependency 'rinruby'
+  s.add_dependency 'Rinruby'
 
   s.rubyforge_project = "glymour"
 
