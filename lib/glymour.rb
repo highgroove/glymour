@@ -212,18 +212,18 @@ module Glymour
       end
       
       def values
-        @table.map(&@block)
-      end
-    end
-    
-    # Gives the location of a column value within a finite set of interval values (i.e. gives discrete state after classing a continuous variable)
-    def location_in_interval(value, intervals)
-      intervals.each_with_index do |x, i|
-        return i if value <= x
+        @intervals ? @table.map { |row| location_in_interval(row) } : @table.map(&@block)
       end
       
-      # Return -1 if value is not within intervals
-      return -1
+      # Gives the location of a column value within a finite set of interval values (i.e. gives discrete state after classing a continuous variable)
+      def location_in_interval(row)
+        intervals.each_with_index do |x, i|
+          return i if value_at(row) <= x
+        end
+
+        # Return -1 if value is not within intervals
+        -1
+      end
     end
     
     # Accepts a list of variables and a row of data and generates a learning row for a Bayes net
@@ -232,7 +232,7 @@ module Glymour
       
       variables.each do |var|
         if var.intervals
-          var_values[var] = location_in_interval(var.value_at(row), var.intervals)
+          var_values[var] = var.value_at(row).location_in_interval
         else
           var_values[var] = var.value_at row
         end
@@ -241,38 +241,36 @@ module Glymour
       var_values
     end
     
-    # Generates a contingency table for two variables from a learning row generated above
-    def contingency_table(var1, var2, rows)
-      values_table = rows.map { |row| learning_row([var1, var2], row) }      
-      
-      row_states = values_table.map { |entry| entry[var1] }.uniq
-      col_states = values_table.map { |entry| entry[var2] }.uniq
-      
-      # R turns lists into matrices by moving up-down, then left-right (i.e. finish a column and move to the next)
-      matrix = []
-      col_states.each do |col_state|
-        row_states.each do |row_state|
-          matrix << values_table.select { |val_pair| val_pair[var1] == row_state and val_pair[var2] == col_state }.length
-        end
-      end
-      
-      "matrix(c(#{matrix.join ', '}), #{row_states.length}, #{col_states.length})"
-    end
-    
     # Takes two variables and an array of conditioning variables
     # Returns true if x and y are coindependent given conditioned_on
     def coindependent?(var1, var2, conditioned_on=[], p_val=0.05)
-      #TODO: Raise an exception if var1 and var2 have different tables?
-      rows = var1.table
+      #TODO: Raise an exception if variables have different tables?
       
-      R.eval <<-EOF
-        library(vcd)
-        t <- coindep_test(#{contingency_table(var1, var2, rows)})
-        p <- t$p.value
-      EOF
+      
+      #rows = var1.table
+      # t <- coindep_test(#{contingency_table(var1, var2, rows)})
+      
+      # Give variables names that R can process
+      # Oh god this makes me feel dirty. Someone tell me there's a better way to do this
+      R.eval "library(vcd)"
+      n=0
+      ([var1, var2] + conditioned_on).each do |var|
+        n+=1
+        list_of_values = var.values.map do |value|
+                                      (value == true || value == false) ? value.to_s.upcase : value
+                                    end.join(', ')
+        R.eval "var#{n} <- c(#{list_of_values})\n"
+      end
+      
+      var_list = (1..n).map { |k| "var#{k}" }.join(', ')
+      
+      R.eval "cond_data <- data.frame(#{var_list})\n"
+      #R.eval "tab <- table(var1, var2)"
+      R.eval "indep <- coindep_test(cond_data)"
+      R.eval "p <- indep$p.value"
+      
       observed_p = R.pull("p").to_f
-      
-      observed_p < p_val
+      observed_p > p_val
     end
   end
   

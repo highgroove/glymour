@@ -6,7 +6,7 @@ describe Glymour::Statistics do
     
     @table_data = []
     
-    10000.times do
+    500.times do
       rain = rand < 0.5
       temp = rain ? 65 + 10 * (rand - 0.5) : 75 + 10 * (rand - 0.5)
       sprinklers = rain ? rand < 0.1 : rand < 0.5
@@ -17,12 +17,8 @@ describe Glymour::Statistics do
     
     @rain_var = Glymour::Statistics::Variable.new(@table_data) { |r| r[:rain] }
     @temp_var = Glymour::Statistics::Variable.new(@table_data, 10) { |r| r[:temp] }
+    @grass_var = Glymour::Statistics::Variable.new(@table_data) { |r| r[:grass_wet] }
     @sprinklers_var = Glymour::Statistics::Variable.new(@table_data) { |r| r[:sprinklers] }
-  end
-  
-  it 'should generate a contingency table for two variables' do 
-    Stats.contingency_table(@rain_var, @sprinklers_var, @table_data).should match /matrix\(c\((\d+, )*\d+\), 2, 2\)/
-    Stats.contingency_table(@temp_var, @sprinklers_var, @table_data).should match /matrix\(c\((\d+, )*\d+\), 10, 2\)/
   end
   
   it 'should give coindependence data for two variable' do
