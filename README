@@ -1,0 +1,5 @@
+Installation
+
+This gem requires a copy of the R interpreter and the vcd library in R.
+
+Install the packages in required_r_packages with "R CMD INSTALL [package name]".
