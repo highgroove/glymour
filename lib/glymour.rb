@@ -261,14 +261,18 @@ module Glymour
     
     # Takes two variables and an array of conditioning variables
     # Returns true if x and y are coindependent given conditioned_on
-    def coindependent?(var1, var2, conditioned_on=[])
+    def coindependent?(var1, var2, conditioned_on=[], p_val=0.05)
       #TODO: Raise an exception if var1 and var2 have different tables?
       rows = var1.table
       
       R.eval <<-EOF
+        library(vcd)
         t <- coindep_test(#{contingency_table(var1, var2, rows)})
+        p <- t$p.value
       EOF
+      observed_p = R.pull("p").to_f
       
+      observed_p < p_val
     end
   end
   
