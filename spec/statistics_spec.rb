@@ -22,5 +22,11 @@ describe Glymour::Statistics do
   
   it 'should generate a contingency table for two variables' do 
     Stats.contingency_table(@rain_var, @sprinklers_var, @table_data).should match /matrix\(c\((\d+, )*\d+\), 2, 2\)/
+    Stats.contingency_table(@temp_var, @sprinklers_var, @table_data).should match /matrix\(c\((\d+, )*\d+\), 10, 2\)/
+  end
+  
+  it 'should give coindependence data for two variable' do
+    Stats.coindependent?(@temp_var, @sprinklers_var, [@rain_var]).should be_true
+    Stats.coindependent?(@rain_var, @sprinklers_var).should be_false
   end
 end

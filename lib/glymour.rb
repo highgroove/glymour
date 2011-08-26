@@ -187,6 +187,7 @@ module Glymour
   end
   
   module Statistics
+    require 'rinruby'
     # Grabs variable data from a table (mostly for quantizing continous vars)
     # block determines the variable value for a given row of table, e.g. { |row| row[:first_seen_at] } or &:first_seen_at
     class Variable
@@ -225,7 +226,7 @@ module Glymour
       return -1
     end
     
-    # Accepts a list of variables and a row of data and generates a learning row for a net
+    # Accepts a list of variables and a row of data and generates a learning row for a Bayes net
     def learning_row(variables, row)
       var_values = {}
       
@@ -262,10 +263,12 @@ module Glymour
     # Returns true if x and y are coindependent given conditioned_on
     def coindependent?(var1, var2, conditioned_on=[])
       #TODO: Raise an exception if var1 and var2 have different tables?
-      rows = var1.values
+      rows = var1.table
+      
       R.eval <<-EOF
         t <- coindep_test(#{contingency_table(var1, var2, rows)})
       EOF
+      
     end
   end
   
