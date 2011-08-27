@@ -1,5 +1,17 @@
 require "glymour"
 
+# Generates the complete graph on n vertices if n is an integer, otherwise
+# the complete graph on the vertices in the enumerable given
+def complete_graph(n)
+  set = (n.class == 'Integer' || n.class == 'Fixnum') ? (1..n) : n
+  RGL::ImplicitGraph.new do |g|
+    g.vertex_iterator { |b| set.each(&b) }
+    g.adjacent_iterator do |x, b|
+      set.each { |y| b.call(y) unless x == y }
+    end
+  end
+end
+
 module Glymour
   # Provides graph structures and algorithms for determining edge structure of a Bayesian net
   module StructureLearning
@@ -58,17 +70,6 @@ module Glymour
       end
     end
 
-    # Generates the complete graph on n vertices if n is an integer, otherwise
-    # the complete graph on the vertices in the enumerable given
-    def complete_graph(n)
-      set = (n.class == 'Integer' || n.class == 'Fixnum') ? (1..n) : n
-      RGL::ImplicitGraph.new do |g|
-        g.vertex_iterator { |b| set.each(&b) }
-        g.adjacent_iterator do |x, b|
-          set.each { |y| b.call(y) unless x == y }
-        end
-      end
-    end
 
     # Takes a list of vertices and a hash of source => [targets] pairs and generates a directed graph
     def make_directed(vertices, directed_edges)
@@ -82,6 +83,8 @@ module Glymour
     end
 
     class LearningNet
+      
+      attr_accessor :net, :directed_edges, :n
       def initialize(variables)
         @net = complete_graph(variables).extend(GraphAlgorithms)
         @directed_edges = {}
@@ -92,23 +95,23 @@ module Glymour
       # Perform one step of the PC algorithm
       def step
         any_independent = false
-        @net.edges.each do |e|
+        net.edges.each do |e|
           a, b = e.source, e.target
           intersect = (@net.adjacent_either(a, b) & @net.verts_on_paths(a, b)).extend(PowerSet)
 
-          # Is |Aab ^ Uab| > @n? 
-          if intersect.length <= @n
+          # Is |Aab ^ Uab| > n? 
+          if intersect.length <= n
             next
           else
             # Are a and b independent conditioned on any subsets of Aab ^ Uab of cardinality n+1?
             if intersect.power_set.select {|s| s.length == n+1}.any? { |subset|
-                #TODO: are a and b independent conditioned on subset?
+                coindependent?(a, b, subset)
               }
               g.remove_vertex e
               any_independent = true
             end
           end
-          @n += 1
+          n += 1
         end
         any_independent
       end
@@ -118,7 +121,7 @@ module Glymour
         # Perform step until every pair of adjacent variables is dependent, and
         # set final_net to the _second-to-last_ state of @net
         begin
-          final_net = @net
+          final_net = net
         end while step
 
         # Direct remaining edges in @net as much as possible
@@ -129,28 +132,28 @@ module Glymour
           if intersect.power_set.select {|s| s.include? b}.all? { |subset| 
             # TODO: Are a and c dependent conditioned on subset?
           }
-            @directed_edges[a] << b
-            @directed_edges[c] << b
+            directed_edges[a] << b
+            directed_edges[c] << b
           end
         end
 
-        @net = final_net
+        net = final_net
       end
 
       # Gives a list of all orientations of @net compatible with @directed_edges
       # (i.e., all directed acyclic graphs with edge structure given partially by @directed_edges)
       def compatible_orientations
         compat_list = []
-        edges = @net.edges.extend(PowerSet)
+        edges = net.edges.extend(PowerSet)
 
-        # Every orientation of @net corresponds to a subset of its edges
+        # Every orientation of net corresponds to a subset of its edges
         edges.power_set.each do |subset|
           # Orient edges in subset as source => target, outside of it as target => source (unless they're in @directed_edges)
           current_orientation = @directed_edges
           current_orientation.default = []
 
           edges.each do |e|
-            unless @directed_edges.include? e
+            unless directed_edges.include? e
               if subset.include? e
                 current_orientation[e.source] << e.target
               else
@@ -159,7 +162,7 @@ module Glymour
             end
           end
 
-          orientation_graph = make_directed(@net.vertices, current_orientation)
+          orientation_graph = make_directed(net.vertices, current_orientation)
           compat_list << orientation_graph if orientation_graph.acyclic?
         end
 

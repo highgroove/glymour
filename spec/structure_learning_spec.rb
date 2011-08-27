@@ -49,4 +49,38 @@ describe Glymour::StructureLearning do
       end
     end
   end
+  
+  describe Glymour::StructureLearning::LearningNet do
+    before(:all) do
+      @table_data = []
+
+      500.times do
+        rain = rand < 0.5
+        temp = rain ? 65 + 10 * (rand - 0.5) : 75 + 10 * (rand - 0.5)
+        sprinklers = rain ? rand < 0.1 : rand < 0.5
+        cat_out = rain || sprinklers ? 0.05 : 0.4
+        grass_wet = (rain && (rand < 0.9)) || (sprinklers && (rand < 0.7)) || (cat_out && (rand < 0.01))
+        @table_data << { :rain => rain, :sprinklers => sprinklers, :cat_out => cat_out, :grass_wet => grass_wet, :temp => temp }
+      end
+
+      @rain_var = Glymour::Statistics::Variable.new(@table_data) { |r| r[:rain] }
+      @temp_var = Glymour::Statistics::Variable.new(@table_data, 10) { |r| r[:temp] }
+      @grass_var = Glymour::Statistics::Variable.new(@table_data) { |r| r[:grass_wet] }
+      @sprinklers_var = Glymour::Statistics::Variable.new(@table_data) { |r| r[:sprinklers] }
+      @cat_var = Glymour::Statistics::Variable.new(@table_data) { |r| r[:cat_out] }
+      
+      @vars = [@rain_var, @temp_var, @grass_var, @sprinklers_var, @cat_var]
+      @lnet = Glymour::StructureLearning::LearningNet.new(@vars)
+    end
+    
+    it 'should initialize a LearningNet on a set of variables' do
+      @lnet.should_not be_nil
+    end
+    
+    it 'should perform a step of the structure learning algorithm' do
+      prev_net = @lnet.net
+      @lnet.step
+      prev_net.should_not eq @lnet.net
+    end
+  end
 end
