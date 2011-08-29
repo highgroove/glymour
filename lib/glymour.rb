@@ -214,6 +214,7 @@ module Glymour
         @block.call(row)
       end
       
+      # Gives an array of all variable values in table
       def values
         @intervals ? @table.map { |row| location_in_interval(row) } : @table.map(&@block)
       end
@@ -244,31 +245,31 @@ module Glymour
       var_values
     end
     
-    # Takes two variables and an array of conditioning variables
-    # Returns true if x and y are coindependent given conditioned_on
-    def coindependent?(var1, var2, conditioned_on=[], p_val=0.05)
+    # Takes two or more Variables
+    # Returns true if first two variables are coindependent given the rest
+    def coindependent?(p_val, *variables)
       #TODO: Raise an exception if variables have different tables?
       
-      
-      #rows = var1.table
-      # t <- coindep_test(#{contingency_table(var1, var2, rows)})
-      
-      # Give variables names that R can process
-      # Oh god this makes me feel dirty. Someone tell me there's a better way to do this
+      # Push variable data into R
+      n_vars = variables.length
+      var_names = (1..n_vars).map { |k| "var#{k}" }
       R.eval "library(vcd)"
-      n=0
-      ([var1, var2] + conditioned_on).each do |var|
-        n+=1
-        list_of_values = var.values.map do |value|
-                                      (value == true || value == false) ? value.to_s.upcase : value
-                                    end.join(', ')
-        R.eval "var#{n} <- c(#{list_of_values})\n"
+      variables.each_with_index do |var, k|
+        # Rinruby can't handle true and false values, so use 1 and 0 resp. instead
+        
+        sanitized_values = var.values.map do |value|
+          if value.is_a?(TrueClass) || value.is_a?(FalseClass)
+            # 1 if true, 0 if false
+            (value && 1) || 0
+          else
+            value
+          end
+        end
+        
+        R.assign "var#{k+1}", sanitized_values
       end
       
-      var_list = (1..n).map { |k| "var#{k}" }.join(', ')
-      
-      R.eval "cond_data <- data.frame(#{var_list})\n"
-      #R.eval "tab <- table(var1, var2)"
+      R.eval "cond_data <- data.frame(#{var_names.join(', ')})\n"
       R.eval "indep <- coindep_test(cond_data)"
       R.eval "p <- indep$p.value"
       

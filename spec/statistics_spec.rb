@@ -22,7 +22,7 @@ describe Glymour::Statistics do
   end
   
   it 'should give coindependence data for two variable' do
-    Stats.coindependent?(@temp_var, @sprinklers_var, [@rain_var]).should be_true
-    Stats.coindependent?(@rain_var, @sprinklers_var).should be_false
+    Stats.coindependent?(0.05, @temp_var, @sprinklers_var, @rain_var).should be_true
+    Stats.coindependent?(0.05, @rain_var, @sprinklers_var).should be_false
   end
 end
