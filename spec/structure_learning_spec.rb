@@ -1,5 +1,6 @@
 require 'glymour'
 require 'rgl/implicit'
+require 'rgl/dot'
 
 describe Glymour::StructureLearning do
   before(:each) do 
@@ -16,7 +17,7 @@ describe Glymour::StructureLearning do
   end
   
   describe 'Within GraphAlgorithms' do
-    before(:each) do      
+    before(:each) do
       class RGL::ImplicitGraph
         include Glymour::StructureLearning::GraphAlgorithms
       end
@@ -27,6 +28,12 @@ describe Glymour::StructureLearning do
       edges = {1 => [2], 2 => [3], 3 => [1, 7], 4 => [3], 7 => [5, 8], 5 => [6], 6 => [7]}
       
       @g = make_directed(vertices, edges)
+    end
+    
+    it 'should remove an edge from a graph' do
+      g = complete_graph(4)
+      orig_edge_count = g.edges.length
+      remove_edge(g, g.edges.first).edges.length.should_not eq orig_edge_count
     end
     
     it 'should compute the vertices on all paths between two vertices' do
@@ -52,35 +59,37 @@ describe Glymour::StructureLearning do
   
   describe Glymour::StructureLearning::LearningNet do
     before(:all) do
-      @table_data = []
-
-      500.times do
-        rain = rand < 0.5
-        temp = rain ? 65 + 10 * (rand - 0.5) : 75 + 10 * (rand - 0.5)
-        sprinklers = rain ? rand < 0.1 : rand < 0.5
-        cat_out = rain || sprinklers ? 0.05 : 0.4
-        grass_wet = (rain && (rand < 0.9)) || (sprinklers && (rand < 0.7)) || (cat_out && (rand < 0.01))
-        @table_data << { :rain => rain, :sprinklers => sprinklers, :cat_out => cat_out, :grass_wet => grass_wet, :temp => temp }
+      @alarm_data = []
+      100000.times do
+        e = rand < 0.002
+        b = rand < 0.001
+        a = b ? (e ? rand < 0.95 : rand < 0.94) : (e ? rand < 0.29 : rand < 0.001)
+        j = a ? rand < 0.90 : rand < 0.05
+        m = a ? rand < 0.70 : rand < 0.01
+        @alarm_data << { :e => e, :b => b, :a => a, :j => j, :m => m}
       end
+      @e = Glymour::Statistics::Variable.new(@alarm_data) { |r| r[:e] }
+      @b = Glymour::Statistics::Variable.new(@alarm_data) { |r| r[:b] }
+      @a = Glymour::Statistics::Variable.new(@alarm_data) { |r| r[:a] }
+      @j = Glymour::Statistics::Variable.new(@alarm_data) { |r| r[:j] }
+      @m = Glymour::Statistics::Variable.new(@alarm_data) { |r| r[:m] }
+      alarm_vars = [@e, @b, @a, @j, @m]
+      @v_hash = { @e => 'e', @b => 'b', @a => 'a', @j => 'j', @m => 'm' }
+      @alarm_net = Glymour::StructureLearning::LearningNet.new(alarm_vars)
+    end
+    
+    # it 'should perform a step of the structure learning algorithm' do
+    #       prev_net = @lnet.net
+    #       @lnet.step
+    #       prev_net.should_not eq @lnet.net
+    #     end
+    # 
+    it 'should perform the structure learning algorithm' do
+      @alarm_net.learn_structure
 
-      @rain_var = Glymour::Statistics::Variable.new(@table_data) { |r| r[:rain] }
-      @temp_var = Glymour::Statistics::Variable.new(@table_data, 10) { |r| r[:temp] }
-      @grass_var = Glymour::Statistics::Variable.new(@table_data) { |r| r[:grass_wet] }
-      @sprinklers_var = Glymour::Statistics::Variable.new(@table_data) { |r| r[:sprinklers] }
-      @cat_var = Glymour::Statistics::Variable.new(@table_data) { |r| r[:cat_out] }
-      
-      @vars = [@rain_var, @temp_var, @grass_var, @sprinklers_var, @cat_var]
-      @lnet = Glymour::StructureLearning::LearningNet.new(@vars)
-    end
-    
-    it 'should initialize a LearningNet on a set of variables' do
-      @lnet.should_not be_nil
-    end
-    
-    it 'should perform a step of the structure learning algorithm' do
-      prev_net = @lnet.net
-      @lnet.step
-      prev_net.should_not eq @lnet.net
+      @alarm_net.net.edges.each do |e|
+        puts "#{@v_hash[e.source]} => #{@v_hash[e.target]}"
+      end
     end
   end
 end

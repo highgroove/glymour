@@ -12,6 +12,8 @@ Gem::Specification.new do |s|
   s.description = %q{Implements supervised Bayesian structure learning, as well as extra tools to help train a Bayesian net using ActiveRecord data}
   
   s.add_development_dependency "rspec"
+  s.add_development_dependency "pry"
+  s.add_development_dependency "ruby-debug"
   
   s.add_dependency 'rgl'
   s.add_dependency 'sbn'
