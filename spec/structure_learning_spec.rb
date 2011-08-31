@@ -1,6 +1,7 @@
 require 'glymour'
 require 'rgl/implicit'
 require 'rgl/dot'
+require 'spec_helper'
 
 describe Glymour::StructureLearning do
   before(:each) do 
@@ -60,12 +61,12 @@ describe Glymour::StructureLearning do
   describe Glymour::StructureLearning::LearningNet do
     before(:all) do
       @alarm_data = []
-      100000.times do
-        e = rand < 0.002
-        b = rand < 0.001
-        a = b ? (e ? rand < 0.95 : rand < 0.94) : (e ? rand < 0.29 : rand < 0.001)
-        j = a ? rand < 0.90 : rand < 0.05
-        m = a ? rand < 0.70 : rand < 0.01
+      100.times do
+        e = prob(0.002)
+        b = prob(0.001)
+        a = b ? (e ? prob(0.95) : prob(0.94)) : (e ? prob(0.29) : prob(0.001))
+        j = a ? prob(0.90) : prob(0.05)
+        m = a ? prob(0.70) : prob(0.01)
         @alarm_data << { :e => e, :b => b, :a => a, :j => j, :m => m}
       end
       @e = Glymour::Statistics::Variable.new(@alarm_data) { |r| r[:e] }
@@ -76,19 +77,30 @@ describe Glymour::StructureLearning do
       alarm_vars = [@e, @b, @a, @j, @m]
       @v_hash = { @e => 'e', @b => 'b', @a => 'a', @j => 'j', @m => 'm' }
       @alarm_net = Glymour::StructureLearning::LearningNet.new(alarm_vars)
+      
+      # Highly simplified test net
+      # Only edges should be @h pointing to @red and @blue
+      @coin_data = []
+      10000.times do
+        h = prob(0.5)
+        red = h ? prob(0.2) : prob(0.7)
+        blue = h ? prob(0.4) : prob(0.9)
+        @coin_data << { :h => h, :red => red, :blue => blue }
+      end
+
+      @h = Glymour::Statistics::Variable.new(@coin_data) { |r| r[:h] }
+      @red = Glymour::Statistics::Variable.new(@coin_data) { |r| r[:red] }
+      @blue = Glymour::Statistics::Variable.new(@coin_data) { |r| r[:blue] }
+      
+      @coin_hash = { @h => 'h', @red => 'red', @blue => 'blue'}
+      @coin_net = Glymour::StructureLearning::LearningNet.new([@h, @red, @blue])
     end
     
-    # it 'should perform a step of the structure learning algorithm' do
-    #       prev_net = @lnet.net
-    #       @lnet.step
-    #       prev_net.should_not eq @lnet.net
-    #     end
-    # 
     it 'should perform the structure learning algorithm' do
-      @alarm_net.learn_structure
-
-      @alarm_net.net.edges.each do |e|
-        puts "#{@v_hash[e.source]} => #{@v_hash[e.target]}"
+      @coin_net.learn_structure
+      
+      @coin_net.net.edges.each do |e|
+        puts "#{@coin_hash[e.source]} => #{@coin_hash[e.target]}"
       end
     end
   end
