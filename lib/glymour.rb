@@ -65,7 +65,7 @@ module Glymour
         @intervals = num_classes ? to_intervals(num_classes) : nil
         
         # names are used as variable names in R, so make sure there's no whitespace
-        @name = name.gsub(/\s+/, '_') if @name
+        @name = name.gsub(/\s+/, '_') if name
       end
       
       # Apply @block to each column value, and 
@@ -262,11 +262,11 @@ module Glymour
             # Are a and b independent conditioned on any subsets of Aab ^ Uab of cardinality n+1?
             valid_intersects = intersect.power_set.select {|s| s.length == n+1}.reject { |subset| subset.include?(a) || subset.include?(b) }
             if valid_intersects.any? { |subset|
-              puts "Testing independence between #{a.name} and #{b.name}, conditioning on #{(subset.any? ? subset.map(&:name).join(', ') : 'nothing') + '...'}" +
-                (coindependent?(0.05, a, b, *subset) ? "They're independent!" : "Nope!")
+              #puts "Testing independence between #{a.name} and #{b.name}, conditioning on #{(subset.any? ? subset.map(&:name).join(', ') : 'nothing') + '...'}" +
+              #  (coindependent?(0.05, a, b, *subset) ? "They're independent!" : "Nope!")
               coindependent?(0.05, a, b, *subset)
             }
-              puts "Removing edge #{e.source.name} => #{e.target.name}"
+              #puts "Removing edge #{e.source.name} => #{e.target.name}"
               @net = remove_edge(net, e)
               any_independent = true
             end
