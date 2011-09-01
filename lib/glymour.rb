@@ -65,7 +65,7 @@ module Glymour
         @intervals = num_classes ? to_intervals(num_classes) : nil
         
         # names are used as variable names in R, so make sure there's no whitespace
-        @name = name.gsub(/\s+/, '_')
+        @name = name.gsub(/\s+/, '_') if @name
       end
       
       # Apply @block to each column value, and 
