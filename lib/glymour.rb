@@ -41,8 +41,6 @@ end
 
 module Glymour
   module Statistics
-    # Grabs variable data from a table (mostly for quantizing continous vars)
-    # block determines the variable value for a given row of table, e.g. { |row| row[:first_seen_at] } or &:first_seen_at
     class VariableContainer
       attr_reader :table, :number_unnamed
       attr_accessor :variables
@@ -65,7 +63,7 @@ module Glymour
         @variable_container = variable_container
         @block = Proc.new &block
         @intervals = num_classes ? to_intervals(num_classes) : nil
-        @name = name
+        @name = name.gsub(/\s+/, '_')
       end
       
       # Apply @block to each column value, and 
@@ -117,8 +115,6 @@ module Glymour
       #TODO: Raise an exception if variables have different tables?
       R.echo(false)
       # Push variable data into R
-      n_vars = variables.length
-      var_names = (1..n_vars).map { |k| "var#{k}" }
       R.eval "library(vcd)"
       
       variables.each_with_index do |var, k|
@@ -132,10 +128,10 @@ module Glymour
           end
         end
         
-        R.assign "var#{k+1}", sanitized_values
+        R.assign var.name, sanitized_values
       end
       
-      R.eval "cond_data <- data.frame(#{var_names.join(', ')})\n"
+      R.eval "cond_data <- data.frame(#{variables.map(&:name).join(', ')})\n"
       R.eval "t <-table(cond_data)"
       
       cond_vars = variables[2..(variables.length-1)]
