@@ -171,9 +171,10 @@ module Glymour
       # Sets an array to its "power array" (array of subarrays)
       def power_set!
         return [[]] if empty?
-        f = shift
-        rec = power_set!
-        rec + rec.map {|i| [f] + i }
+        first = shift
+        rest = power_set!
+        
+        rest + rest.map {|subset| [first] + subset }
       end
 
       def power_set
