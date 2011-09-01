@@ -63,6 +63,8 @@ module Glymour
         @variable_container = variable_container
         @block = Proc.new &block
         @intervals = num_classes ? to_intervals(num_classes) : nil
+        
+        # names are used as variable names in R, so make sure there's no whitespace
         @name = name.gsub(/\s+/, '_')
       end
       
