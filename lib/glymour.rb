@@ -262,8 +262,8 @@ module Glymour
             # Are a and b independent conditioned on any subsets of Aab ^ Uab of cardinality n+1?
             valid_intersects = intersect.power_set.select {|s| s.length == n+1}.reject { |subset| subset.include?(a) || subset.include?(b) }
             if valid_intersects.any? { |subset|
-              #puts "Testing independence between #{a.name} and #{b.name}, conditioning on #{(subset.any? ? subset.map(&:name).join(', ') : 'nothing') + '...'}" +
-              #  (coindependent?(0.05, a, b, *subset) ? "They're independent!" : "Nope!")
+              puts "Testing independence between #{a.name} and #{b.name}, conditioning on #{(subset.any? ? subset.map(&:name).join(', ') : 'nothing') + '...'}" +
+                (coindependent?(0.05, a, b, *subset) ? "[+]" : "[-]")
               coindependent?(0.05, a, b, *subset)
             }
               #puts "Removing edge #{e.source.name} => #{e.target.name}"
@@ -278,13 +278,15 @@ module Glymour
 
       # Perform the PC algorithm in full
       def learn_structure
+        puts "Learning undirected net structure..."
         # Perform step until every pair of adjacent variables is dependent, and
         # set final_net to the _second-to-last_ state of @net
         begin
           puts "n = #{@n}"
           final_net = net
         end while self.step
-
+        
+        puts "Directing edges where possible..."
         # Direct remaining edges in @net as much as possible
         final_net.non_transitive.each do |triple|
           a, b, c = *triple
