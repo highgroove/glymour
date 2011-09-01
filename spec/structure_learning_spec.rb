@@ -61,7 +61,7 @@ describe Glymour::StructureLearning do
   describe Glymour::StructureLearning::LearningNet do
     before(:all) do
       @alarm_data = []
-      100.times do
+      100000.times do
         e = prob(0.002)
         b = prob(0.001)
         a = b ? (e ? prob(0.95) : prob(0.94)) : (e ? prob(0.29) : prob(0.001))
@@ -69,14 +69,16 @@ describe Glymour::StructureLearning do
         m = a ? prob(0.70) : prob(0.01)
         @alarm_data << { :e => e, :b => b, :a => a, :j => j, :m => m}
       end
-      @e = Glymour::Statistics::Variable.new(@alarm_data) { |r| r[:e] }
-      @b = Glymour::Statistics::Variable.new(@alarm_data) { |r| r[:b] }
-      @a = Glymour::Statistics::Variable.new(@alarm_data) { |r| r[:a] }
-      @j = Glymour::Statistics::Variable.new(@alarm_data) { |r| r[:j] }
-      @m = Glymour::Statistics::Variable.new(@alarm_data) { |r| r[:m] }
+      @e = Glymour::Statistics::Variable.new(@alarm_data, "Earthquake") { |r| r[:e] }
+      @b = Glymour::Statistics::Variable.new(@alarm_data, "Burglary") { |r| r[:b] }
+      @a = Glymour::Statistics::Variable.new(@alarm_data, "Alarm") { |r| r[:a] }
+      @j = Glymour::Statistics::Variable.new(@alarm_data, "John Calls") { |r| r[:j] }
+      @m = Glymour::Statistics::Variable.new(@alarm_data, "Mary Calls") { |r| r[:m] }
       alarm_vars = [@e, @b, @a, @j, @m]
       @v_hash = { @e => 'e', @b => 'b', @a => 'a', @j => 'j', @m => 'm' }
-      @alarm_net = Glymour::StructureLearning::LearningNet.new(alarm_vars)
+      
+      alarm_container = Glymour::Statistics::VariableContainer.new(@alarm_data, [@e, @b, @a, @j, @m])
+      @alarm_net = Glymour::StructureLearning::LearningNet.new(alarm_container)
       
       # Highly simplified test net
       # Only edges should be @h pointing to @red and @blue
@@ -87,21 +89,29 @@ describe Glymour::StructureLearning do
         blue = h ? prob(0.4) : prob(0.9)
         @coin_data << { :h => h, :red => red, :blue => blue }
       end
-
-      @h = Glymour::Statistics::Variable.new(@coin_data) { |r| r[:h] }
-      @red = Glymour::Statistics::Variable.new(@coin_data) { |r| r[:red] }
-      @blue = Glymour::Statistics::Variable.new(@coin_data) { |r| r[:blue] }
+      
+      @h = Glymour::Statistics::Variable.new(@coin_data, "Heads") { |r| r[:h] }
+      @red = Glymour::Statistics::Variable.new(@coin_data, "Red") { |r| r[:red] }
+      @blue = Glymour::Statistics::Variable.new(@coin_data, "Blue") { |r| r[:blue] }
       
       @coin_hash = { @h => 'h', @red => 'red', @blue => 'blue'}
-      @coin_net = Glymour::StructureLearning::LearningNet.new([@h, @red, @blue])
+      
+      coin_container = Glymour::Statistics::VariableContainer.new(@coin_data, [@h, @red, @blue])
+      @coin_net = Glymour::StructureLearning::LearningNet.new(coin_container)
     end
     
     it 'should perform the structure learning algorithm' do
-      @coin_net.learn_structure
+      @alarm_net.net.edges.each do |e|
+        puts "#{e.source.name} => #{e.target.name}"
+      end
       
-      @coin_net.net.edges.each do |e|
-        puts "#{@coin_hash[e.source]} => #{@coin_hash[e.target]}"
+      @alarm_net.learn_structure
+      
+      @alarm_net.net.edges.each do |e|
+        puts "#{e.source.name} => #{e.target.name}"
       end
     end
+    
+    
   end
 end

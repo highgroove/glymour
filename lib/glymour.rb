@@ -43,11 +43,26 @@ module Glymour
   module Statistics
     # Grabs variable data from a table (mostly for quantizing continous vars)
     # block determines the variable value for a given row of table, e.g. { |row| row[:first_seen_at] } or &:first_seen_at
-    class Variable
-      attr_accessor :intervals, :table, :name
+    class VariableContainer
+      attr_reader :table, :number_unnamed
+      attr_accessor :variables
       
-      def initialize(table, name="unnamed_var", num_classes=nil, &block)
+      def initialize(table, variables=[])
+        number_unnamed = 0
         @table = table
+        @variables = variables
+        @variables.each do |var|
+          var.variable_container = self
+          var.name ||= "unnamed_variable#{number_unnamed+=1}"
+        end
+      end
+    end
+    
+    class Variable
+      attr_accessor :intervals, :variable_container, :name
+      
+      def initialize(variable_container = nil, name = nil, num_classes = nil, &block)
+        @variable_container = variable_container
         @block = Proc.new &block
         @intervals = num_classes ? to_intervals(num_classes) : nil
         @name = name
@@ -62,12 +77,12 @@ module Glymour
       end
       
       def value_at(row)
-        @intervals? location_in_interval(row) : @block.call(row)
+        @intervals ? location_in_interval(row) : @block.call(row)
       end
       
       # Gives an array of all variable values in table
       def values
-        @intervals ? @table.map { |row| location_in_interval(row) } : @table.map(&@block)
+        @intervals ? @variable_container.table.map { |row| location_in_interval(row) } : @variable_container.table.map(&@block)
       end
       
       # Gives the location of a column value within a finite set of interval values (i.e. gives discrete state after classing a continuous variable)
@@ -126,7 +141,7 @@ module Glymour
       cond_vars = variables[2..(variables.length-1)]
       
       # If no conditioning variables are given, just return the chi square test for the first two
-      if cond_vars.length == 0
+      if cond_vars.empty?
         R.eval "chisq <- chisq.test(t)"
         observed_p = R.pull "chisq$p.value"
         return observed_p > p_val
@@ -227,8 +242,8 @@ module Glymour
     class LearningNet
       include Glymour::Statistics
       attr_accessor :net, :directed_edges, :n
-      def initialize(variables)
-        @net = complete_graph(variables).extend(GraphAlgorithms)
+      def initialize(variable_container)
+        @net = complete_graph(variable_container.variables).extend(GraphAlgorithms)
         @directed_edges = {}
         @directed_edges.default = []
         @n = -1
@@ -248,16 +263,17 @@ module Glymour
             # Are a and b independent conditioned on any subsets of Aab ^ Uab of cardinality n+1?
             valid_intersects = intersect.power_set.select {|s| s.length == n+1}.reject { |subset| subset.include?(a) || subset.include?(b) }
             if valid_intersects.any? { |subset|
-              puts "Testing independence between #{a.name} and #{b.name}, conditioning on #{subset.map(&:name).join(', ')}"
-              puts (coindependent?(0.05, a, b, *subset) ? "They're independent!" : "Nope!")
+              puts "Testing independence between #{a.name} and #{b.name}, conditioning on #{(subset.any? ? subset.map(&:name).join(', ') : 'nothing') + '...'}" +
+                (coindependent?(0.05, a, b, *subset) ? "They're independent!" : "Nope!")
               coindependent?(0.05, a, b, *subset)
             }
+              puts "Removing edge #{e.source.name} => #{e.target.name}"
               @net = remove_edge(net, e)
               any_independent = true
             end
           end
-          @n += 1
         end
+        @n += 1
         any_independent
       end
 
@@ -266,6 +282,7 @@ module Glymour
         # Perform step until every pair of adjacent variables is dependent, and
         # set final_net to the _second-to-last_ state of @net
         begin
+          puts "n = #{@n}"
           final_net = net
         end while self.step
 

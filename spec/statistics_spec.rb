@@ -22,8 +22,9 @@ describe Glymour::Statistics do
     @a = Glymour::Statistics::Variable.new(@alarm_data) { |r| r[:a] }
     @j = Glymour::Statistics::Variable.new(@alarm_data) { |r| r[:j] }
     @m = Glymour::Statistics::Variable.new(@alarm_data) { |r| r[:m] }
-    alarm_vars = [@e, @b, @a, @j, @m]
-    @alarm_net = Glymour::StructureLearning::LearningNet.new(alarm_vars)
+    
+    alarm_container = Glymour::Statistics::VariableContainer.new(@alarm_data, [@e, @b, @a, @j, @m])
+    @alarm_net = Glymour::StructureLearning::LearningNet.new(alarm_container)
     
     @coin_data = []
     10000.times do
@@ -36,7 +37,9 @@ describe Glymour::Statistics do
     @h = Glymour::Statistics::Variable.new(@coin_data) { |r| r[:h] }
     @red = Glymour::Statistics::Variable.new(@coin_data) { |r| r[:red] }
     @blue = Glymour::Statistics::Variable.new(@coin_data) { |r| r[:blue] }
-    @coin_net = Glymour::StructureLearning::LearningNet.new([@h, @red, @blue])
+    
+    coin_container = Glymour::Statistics::VariableContainer.new(@coin_data, [@h, @red, @blue])
+    @coin_net = Glymour::StructureLearning::LearningNet.new(coin_container)
   end
   
   it 'should give chi square independence data for two variables' do
@@ -48,4 +51,18 @@ describe Glymour::Statistics do
     Stats.coindependent?(0.05, @red, @blue, @h).should be_true
     Stats.coindependent?(0.05, @j, @m, @a).should be_true
   end
+  
+  describe Glymour::Statistics::VariableContainer
+    it 'should set variable name when nil' do
+      var = Glymour::Statistics::Variable.new([]) {|r| r}
+      container = Glymour::Statistics::VariableContainer.new([], [var])
+      var.name.should_not be_nil
+    end
+      
+    it 'should create unique names for variables' do
+      var1 = Glymour::Statistics::Variable.new([]) {|r| r}
+      var2 = Glymour::Statistics::Variable.new([]) {|r| r}
+      container = Glymour::Statistics::VariableContainer.new([], [var1, var2])
+      var1.name.should_not eq var2.name
+    end
 end
