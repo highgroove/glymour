@@ -1,12 +1,11 @@
 require "glymour"
 require "pry"
 require "rinruby"
-#require "ruby-debug/debugger"
 
 # Generates the complete graph on n vertices if n is an integer, otherwise
 # the complete graph on the vertices in the enumerable given
 def complete_graph(n)
-  set = n.is_a?(Integer) ? (1..n) : n
+  set = (Integer === n) ? 1..n : n
   RGL::ImplicitGraph.new do |g|
     g.vertex_iterator { |b| set.each(&b) }
     g.adjacent_iterator do |x, b|
@@ -45,12 +44,13 @@ module Glymour
     # Grabs variable data from a table (mostly for quantizing continous vars)
     # block determines the variable value for a given row of table, e.g. { |row| row[:first_seen_at] } or &:first_seen_at
     class Variable
-      attr_accessor :intervals, :table
+      attr_accessor :intervals, :table, :name
       
-      def initialize(table, num_classes=nil, &block)
+      def initialize(table, name="unnamed_var", num_classes=nil, &block)
         @table = table
         @block = Proc.new &block
         @intervals = num_classes ? to_intervals(num_classes) : nil
+        @name = name
       end
       
       # Apply @block to each column value, and 
@@ -62,7 +62,7 @@ module Glymour
       end
       
       def value_at(row)
-        @block.call(row)
+        @intervals? location_in_interval(row) : @block.call(row)
       end
       
       # Gives an array of all variable values in table
@@ -105,14 +105,15 @@ module Glymour
       n_vars = variables.length
       var_names = (1..n_vars).map { |k| "var#{k}" }
       R.eval "library(vcd)"
+      
       variables.each_with_index do |var, k|
+        
         # Rinruby can't handle true and false values, so use 1 and 0 resp. instead
         sanitized_values = var.values.map do |value|
-          if value.is_a?(TrueClass) || value.is_a?(FalseClass)
-            # 1 if true, 0 if false
-            (value && 1) || 0
-          else
-            value
+          case value
+            when true  then 1
+            when false then 0
+            else value
           end
         end
         
@@ -121,7 +122,6 @@ module Glymour
       
       R.eval "cond_data <- data.frame(#{var_names.join(', ')})\n"
       R.eval "t <-table(cond_data)"
-      s_vals =[]
       
       cond_vars = variables[2..(variables.length-1)]
       
@@ -134,19 +134,21 @@ module Glymour
       
       cond_values = cond_vars.map { |var| (1..var.values.uniq.length).collect }
       
+      # Find the chi-squared statistic for every state of the conditioning variables and sum them
+      chisq_sum = 0
+      df = 0
       cartprod(*cond_values).each do |value|
-        R.eval "chisq <- chisq.test(t[,,#{value.join(',')}])"
+        R.eval "partial_table <- t[,,#{value.join(',')}]"
+        
+        R.eval "chisq <- chisq.test(partial_table)"
         R.eval "s <- chisq$statistic"
-        if R.pull("s") == (1/0.0)
-          puts "s is Infinity"
-          return true
-        else
-          observed_s = R.pull("s").to_f
-          s_vals << observed_s
-        end
+        observed_s = R.pull("s").to_f
+        chisq_sum += observed_s
+        df += R.pull("chisq$parameter").to_i
       end
-      chisq_sum = s_vals.compact.reduce(0, :+)
-      R.pull("pchisq(#{chisq_sum}, #{cond_vars.length})").to_f > p_val
+      # Compute the p-value of the sum of statistics
+      observed_p = 1 - R.pull("pchisq(#{chisq_sum}, #{df})").to_f
+      observed_p > p_val
     end
   end
   
@@ -244,7 +246,12 @@ module Glymour
             next
           else
             # Are a and b independent conditioned on any subsets of Aab ^ Uab of cardinality n+1?
-            if intersect.power_set.select {|s| s.length == n+1}.any? { |subset| coindependent?(0.05, a, b, *subset) }
+            valid_intersects = intersect.power_set.select {|s| s.length == n+1}.reject { |subset| subset.include?(a) || subset.include?(b) }
+            if valid_intersects.any? { |subset|
+              puts "Testing independence between #{a.name} and #{b.name}, conditioning on #{subset.map(&:name).join(', ')}"
+              puts (coindependent?(0.05, a, b, *subset) ? "They're independent!" : "Nope!")
+              coindependent?(0.05, a, b, *subset)
+            }
               @net = remove_edge(net, e)
               any_independent = true
             end
@@ -265,7 +272,7 @@ module Glymour
         # Direct remaining edges in @net as much as possible
         final_net.non_transitive.each do |triple|
           a, b, c = *triple
-          intersect = (final_net.extend(StructureLearning::GraphAlgorithms).adjacent_either(a, c) & final_net.extend(StructureLearning::GraphAlgorithms).verts_on_paths(a, c)).extend(PowerSet)
+          intersect = (final_net.adjacent_either(a, c) & final_net.verts_on_paths(a, c)).extend(PowerSet)
 
           if intersect.power_set.select {|s| s.include? b}.all? { |subset| 
             coindependent?(a, c, *subset)
