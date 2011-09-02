@@ -96,21 +96,6 @@ module Glymour
       end
     end
     
-    # Accepts a list of variables and a row of data and generates a learning row for a Bayes net
-    def learning_row(variables, row)
-      var_values = {}
-      
-      variables.each do |var|
-        if var.intervals
-          var_values[var] = var.value_at(row).location_in_interval
-        else
-          var_values[var] = var.value_at row
-        end
-      end
-      
-      var_values
-    end
-    
     # Takes two or more Variables
     # Returns true if first two variables are coindependent given the rest
     def coindependent?(p_val, *variables)
@@ -190,7 +175,12 @@ module Glymour
       # Returns a (unique) list of vertices adjacent to vertex a or b.
       # This is denoted "Aab" in Spirtes-Glymour's paper.
       def adjacent_either(a, b)
-        (adjacent_vertices(a) + adjacent_vertices(b)).uniq
+        (adjacent_undirected(a) + adjacent_undirected(b)).uniq
+      end
+      
+      def adjacent_undirected(vertex)
+        adjacent_sources = vertices.select { |w| adjacent_vertices(w).include?(vertex) }
+        adjacent_vertices(vertex) + adjacent_sources
       end
 
       # Returns an array of all vertices on undirected simple paths between s and t.
@@ -200,7 +190,7 @@ module Glymour
         if current_vertex == t
           paths << current_path + [current_vertex]
         else
-          adjacent_vertices(current_vertex).each do |v|
+          adjacent_undirected(current_vertex).each do |v|
             # Don't recur if we're repeating vertices (i.e. reject non-simple paths)
             verts_on_paths(v, t, current_path + [current_vertex], paths) if current_path.count(current_vertex) == 0
           end
@@ -212,21 +202,18 @@ module Glymour
       # Returns a list of _ordered_ 3-tuples (a, b, c) of vertices such that
       # (a, b) are adjacent and (b,c) are adjacent, but (a,c) are not.
       def non_transitive
-        non_transitive_verts = []
-
-        vertices.each do |u|
-          adjacent_vertices(u).each do |v|
-            adjacent_vertices(v).each do |w|
-              non_transitive_verts << [u, v, w]
-            end
-          end
+        triples = vertices.product(vertices, vertices)
+        
+        adjacent_triples = triples.select do |triple|
+          adjacent_undirected(triple.first).include?(triple[1]) && adjacent_undirected(triple[1]).include?(triple.last)
         end
-        non_transitive_verts.reject do |triple|
-          adjacent_vertices(triple.first).include? triple.last
+        
+        adjacent_triples.reject do |triple|
+          (adjacent_undirected(triple.first).include? triple.last) || (triple.first == triple.last)
         end
       end
     end
-
+    
     # Takes a list of vertices and a hash of source => [targets] pairs and generates a directed graph
     def make_directed(vertices, directed_edges)
       RGL::ImplicitGraph.new do |g|
@@ -237,7 +224,7 @@ module Glymour
         end
       end
     end
-
+    
     class LearningNet
       include Glymour::Statistics
       attr_accessor :net, :directed_edges, :n
@@ -247,14 +234,14 @@ module Glymour
         @directed_edges.default = []
         @n = -1
       end
-
+      
       # Perform one step of the PC algorithm
       def step
         any_independent = false
         net.edges.each do |e|
           a, b = e.source, e.target
           intersect = (@net.adjacent_either(a, b) & @net.verts_on_paths(a, b)).extend(PowerSet)
-
+          
           # Is |Aab ^ Uab| > n? 
           if intersect.length <= n
             next
@@ -262,11 +249,10 @@ module Glymour
             # Are a and b independent conditioned on any subsets of Aab ^ Uab of cardinality n+1?
             valid_intersects = intersect.power_set.select {|s| s.length == n+1}.reject { |subset| subset.include?(a) || subset.include?(b) }
             if valid_intersects.any? { |subset|
-              puts "Testing independence between #{a.name} and #{b.name}, conditioning on #{(subset.any? ? subset.map(&:name).join(', ') : 'nothing') + '...'}" +
-                (coindependent?(0.05, a, b, *subset) ? "[+]" : "[-]")
+              print "Testing independence between #{a.name} and #{b.name}, conditioning on #{(subset.any? ? subset.map(&:name).join(', ') : 'nothing') + '...'}"
+              print (coindependent?(0.05, a, b, *subset) ? "[+]\n" : "[-]\n")
               coindependent?(0.05, a, b, *subset)
             }
-              #puts "Removing edge #{e.source.name} => #{e.target.name}"
               @net = remove_edge(net, e)
               any_independent = true
             end
@@ -275,34 +261,38 @@ module Glymour
         @n += 1
         any_independent
       end
-
+      
       # Perform the PC algorithm in full
       def learn_structure
         puts "Learning undirected net structure..."
         # Perform step until every pair of adjacent variables is dependent, and
         # set final_net to the _second-to-last_ state of @net
         begin
-          puts "n = #{@n}"
+          puts "n = #{n}"
           final_net = net
-        end while self.step
+          step
+        end while n < net.vertices.length - 1
+        
+        net = final_net
         
         puts "Directing edges where possible..."
         # Direct remaining edges in @net as much as possible
         final_net.non_transitive.each do |triple|
           a, b, c = *triple
+          
           intersect = (final_net.adjacent_either(a, c) & final_net.verts_on_paths(a, c)).extend(PowerSet)
-
-          if intersect.power_set.select {|s| s.include? b}.all? { |subset| 
-            coindependent?(a, c, *subset)
+          if intersect.power_set.select {|s| s.include? b}.none? { |subset| 
+            coindependent?(0.05, a, c, *subset)
           }
-            directed_edges[a] << b
-            directed_edges[c] << b
+            puts "Adding directed edge #{a.name} => #{b.name}..."
+            @directed_edges[a] = (@directed_edges[a] << b).uniq
+            
+            puts "Adding directed edge #{c.name} => #{b.name}..."
+            @directed_edges[c] = (@directed_edges[c] << b).uniq
           end
         end
-
-        net = final_net
       end
-
+      
       # Gives a list of all orientations of @net compatible with @directed_edges
       # (i.e., all directed acyclic graphs with edge structure given partially by @directed_edges)
       def compatible_orientations
@@ -332,27 +322,5 @@ module Glymour
         compat_list
       end
     end
-  end
-  
-  # Converts a DAG from StructureLearning into a Bayesian net
-  module GraphToBayesNet
-    def to_bn(title)
-      vars = {}
-      return_net = Sbn::Net.new(title)
-      
-      vertices.each do |v|
-        vars[v] = Sbn::Variable.new(return_net, v.to_sym)
-      end
-      
-      edges.each do |e|
-        vars[e.source].add_child(vars[e.target])
-      end
-      
-      return_net
-    end
-  end
-  
-  module Correlator
-    
   end
 end
