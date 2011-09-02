@@ -62,8 +62,8 @@ describe Glymour::StructureLearning do
     before(:all) do
       @alarm_data = []
       100000.times do
-        e = prob(0.002)
-        b = prob(0.001)
+        e = prob(0.005)
+        b = prob(0.004)
         a = b ? (e ? prob(0.95) : prob(0.94)) : (e ? prob(0.29) : prob(0.001))
         j = a ? prob(0.90) : prob(0.05)
         m = a ? prob(0.70) : prob(0.01)
