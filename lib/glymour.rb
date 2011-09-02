@@ -275,12 +275,17 @@ module Glymour
         
         net = final_net
         
+        direct_edges
+      end
+      
+      # Direct remaining edges in @net as much as possible
+      def direct_edges
         puts "Directing edges where possible..."
-        # Direct remaining edges in @net as much as possible
-        final_net.non_transitive.each do |triple|
+        
+        net.non_transitive.each do |triple|
           a, b, c = *triple
           
-          intersect = (final_net.adjacent_either(a, c) & final_net.verts_on_paths(a, c)).extend(PowerSet)
+          intersect = (net.adjacent_either(a, c) & net.verts_on_paths(a, c)).extend(PowerSet)
           if intersect.power_set.select {|s| s.include? b}.none? { |subset| 
             coindependent?(0.05, a, c, *subset)
           }
@@ -292,6 +297,7 @@ module Glymour
           end
         end
       end
+      
       
       # Gives a list of all orientations of @net compatible with @directed_edges
       # (i.e., all directed acyclic graphs with edge structure given partially by @directed_edges)
