@@ -102,10 +102,7 @@ module Glymour
       #TODO: Raise an exception if variables have different tables?
       R.echo(false)
       # Push variable data into R
-      R.eval "library(vcd)"
-      
       variables.each_with_index do |var, k|
-        
         # Rinruby can't handle true and false values, so use 1 and 0 resp. instead
         sanitized_values = var.values.map do |value|
           case value
