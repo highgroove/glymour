@@ -228,11 +228,14 @@ module Glymour
     class LearningNet
       include Glymour::Statistics
       attr_accessor :net, :directed_edges, :n
-      def initialize(variable_container)
+      attr_reader :p_value
+      
+      def initialize(variable_container, p_value = 0.05)
         @net = complete_graph(variable_container.variables).extend(GraphAlgorithms)
         @directed_edges = {}
         @directed_edges.default = []
         @n = -1
+        @p_value = p_value
       end
       
       # Perform one step of the PC algorithm
@@ -250,8 +253,8 @@ module Glymour
             valid_intersects = intersect.power_set.select {|s| s.length == n+1}.reject { |subset| subset.include?(a) || subset.include?(b) }
             if valid_intersects.any? { |subset|
               print "Testing independence between #{a.name} and #{b.name}, conditioning on #{(subset.any? ? subset.map(&:name).join(', ') : 'nothing') + '...'}"
-              print (coindependent?(0.05, a, b, *subset) ? "[+]\n" : "[-]\n")
-              coindependent?(0.05, a, b, *subset)
+              print (coindependent?(p_value, a, b, *subset) ? "[+]\n" : "[-]\n")
+              coindependent?(p_value, a, b, *subset)
             }
               @net = remove_edge(net, e)
               any_independent = true
@@ -287,7 +290,7 @@ module Glymour
           
           intersect = (net.adjacent_either(a, c) & net.verts_on_paths(a, c)).extend(PowerSet)
           if intersect.power_set.select {|s| s.include? b}.none? { |subset| 
-            coindependent?(0.05, a, c, *subset)
+            coindependent?(p_value, a, c, *subset)
           }
             puts "Adding directed edge #{a.name} => #{b.name}..."
             @directed_edges[a] = (@directed_edges[a] << b).uniq
