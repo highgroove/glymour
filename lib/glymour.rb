@@ -1,6 +1,7 @@
 require "glymour"
 require "pry"
 require "rinruby"
+require "rgl/adjacency"
 
 # Generates the complete graph on n vertices if n is an integer, otherwise
 # the complete graph on the vertices in the enumerable given
@@ -23,6 +24,30 @@ def remove_edge(orig, e)
     end
   end
   new_graph
+end
+
+# Takes a list of vertices and a hash of source => [targets] pairs and generates a directed graph
+def make_directed(vertices, directed_edges)
+  g = RGL::DirectedAdjacencyGraph.new
+  
+  vertices.each { |v| g.add_vertex(v) }
+  
+  directed_edges.each do |source, targets|
+    targets.each { |target| g.add_edge(source, target) }
+  end
+  
+  g
+end
+
+# Takes a list of vertices and a hash of source => [targets] pairs and generates an implicit (undirected) graph
+def make_implicit(vertices, edges)
+  RGL::ImplicitGraph.new do |g|
+    edges.default = []
+    g.vertex_iterator { |b| vertices.each(&b) }
+    g.adjacent_iterator do |x, b|
+      vertices.each {|y| b.call(y) if edges[x].include? y}
+    end
+  end
 end
 
 def cartprod(*args)
@@ -211,17 +236,6 @@ module Glymour
       end
     end
     
-    # Takes a list of vertices and a hash of source => [targets] pairs and generates a directed graph
-    def make_directed(vertices, directed_edges)
-      RGL::ImplicitGraph.new do |g|
-        directed_edges.default = []
-        g.vertex_iterator { |b| vertices.each(&b) }
-        g.adjacent_iterator do |x, b|
-          vertices.each {|y| b.call(y) if directed_edges[x].include? y}
-        end
-      end
-    end
-    
     class LearningNet
       include Glymour::Statistics
       attr_accessor :net, :directed_edges, :n
@@ -304,13 +318,13 @@ module Glymour
       def compatible_orientations
         compat_list = []
         edges = net.edges.extend(PowerSet)
-
+        
         # Every orientation of net corresponds to a subset of its edges
         edges.power_set.each do |subset|
           # Orient edges in subset as source => target, outside of it as target => source (unless they're in @directed_edges)
           current_orientation = @directed_edges
           current_orientation.default = []
-
+          
           edges.each do |e|
             unless directed_edges.include? e
               if subset.include? e
@@ -320,11 +334,11 @@ module Glymour
               end
             end
           end
-
+          
           orientation_graph = make_directed(net.vertices, current_orientation)
           compat_list << orientation_graph if orientation_graph.acyclic?
         end
-
+        
         compat_list
       end
     end
