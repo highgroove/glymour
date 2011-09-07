@@ -28,7 +28,7 @@ describe Glymour::StructureLearning do
       vertices = (1..8).collect
       edges = {1 => [2], 2 => [3], 3 => [1, 7], 4 => [3], 7 => [5, 8], 5 => [6], 6 => [7]}
       
-      @g = make_directed(vertices, edges)
+      @g = make_implicit(vertices, edges)
     end
     
     it 'should remove an edge from a graph' do
@@ -63,12 +63,18 @@ describe Glymour::StructureLearning do
       alarm_init
     end
     
-    it 'should perform the structure learning algorithm' do     
+    it 'should perform the structure learning algorithm' do
+      prev_n_edges = @alarm_net.net.edges.length
+      
       @alarm_net.learn_structure
       
-      @alarm_net.net.edges.each do |e|
-        puts "#{e.source.name} => #{e.target.name}"
-      end
+      @alarm_net.net.edges.length.should be < prev_n_edges
+    end
+    
+    it 'should produce orientations compatible with learn_structure output' do
+      orientations = @alarm_net.compatible_orientations
+      
+      orientations.length.should eq 4
     end
   end
 end

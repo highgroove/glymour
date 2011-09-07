@@ -2,6 +2,7 @@ require "glymour"
 require "pry"
 require "rinruby"
 require "rgl/adjacency"
+require "rgl/topsort"
 
 # Generates the complete graph on n vertices if n is an integer, otherwise
 # the complete graph on the vertices in the enumerable given
@@ -321,22 +322,20 @@ module Glymour
         
         # Every orientation of net corresponds to a subset of its edges
         edges.power_set.each do |subset|
-          # Orient edges in subset as source => target, outside of it as target => source (unless they're in @directed_edges)
-          current_orientation = @directed_edges
-          current_orientation.default = []
+          # Orient edges in subset as source => target, outside of it as target => source
+          # Any edges conflicting with directed_edges will be cyclic and therefore not counted
+          current_orientation = make_directed(net.vertices, @directed_edges)
           
           edges.each do |e|
-            unless directed_edges.include? e
-              if subset.include? e
-                current_orientation[e.source] << e.target
-              else
-                current_orientation[e.target] << e.source
-              end
+            if subset.include? e
+              current_orientation.add_edge(e.source, e.target)
+            else
+              current_orientation.add_edge(e.target, e.source)
             end
           end
           
-          orientation_graph = make_directed(net.vertices, current_orientation)
-          compat_list << orientation_graph if orientation_graph.acyclic?
+          compat_list << current_orientation if current_orientation.acyclic?
+          print "\n"
         end
         
         compat_list
