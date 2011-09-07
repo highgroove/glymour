@@ -141,8 +141,10 @@ module Glymour
         R.assign var.name, sanitized_values
       end
       
-      R.eval "cond_data <- data.frame(#{variables.map(&:name).join(', ')})\n"
-      R.eval "t <-table(cond_data)"
+      R.eval <<-EOF
+        cond_data <- data.frame(#{variables.map(&:name).join(', ')})
+        t <-table(cond_data)
+      EOF
       
       cond_vars = variables[2..(variables.length-1)]
       
@@ -159,10 +161,12 @@ module Glymour
       chisq_sum = 0
       df = 0
       cartprod(*cond_values).each do |value|
-        R.eval "partial_table <- t[,,#{value.join(',')}]"
+        R.eval <<-EOF
+          partial_table <- t[,,#{value.join(',')}]
+          chisq <- chisq.test(partial_table)
+          s <- chisq$statistic
+        EOF
         
-        R.eval "chisq <- chisq.test(partial_table)"
-        R.eval "s <- chisq$statistic"
         observed_s = R.pull("s").to_f
         chisq_sum += observed_s
         df += R.pull("chisq$parameter").to_i
