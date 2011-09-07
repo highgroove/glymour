@@ -103,12 +103,12 @@ module Glymour
       end
       
       def value_at(row)
-        @intervals ? location_in_interval(row) : @block.call(row)
+        intervals ? location_in_interval(row) : @block.call(row)
       end
       
       # Gives an array of all variable values in table
       def values
-        @intervals ? @variable_container.table.map { |row| location_in_interval(row) } : @variable_container.table.map(&@block)
+        intervals ? variable_container.table.map { |row| location_in_interval(row) } : variable_container.table.map(&@block)
       end
       
       # Gives the location of a column value within a finite set of interval values (i.e. gives discrete state after classing a continuous variable)
