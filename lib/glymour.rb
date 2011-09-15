@@ -77,18 +77,19 @@ module Glymour
         @variables = variables
         @variables.each do |var|
           var.variable_container = self
-          var.name ||= "unnamed_variable#{number_unnamed+=1}"
+          var.set_intervals if var.num_classes
+          var.name ||= "unnamed_variable#{number_unnamed += 1}"
         end
       end
     end
     
     class Variable
-      attr_accessor :intervals, :variable_container, :name
+      attr_accessor :intervals, :variable_container, :name, :num_classes
       
-      def initialize(variable_container = nil, name = nil, num_classes = nil, &block)
-        @variable_container = variable_container
+      def initialize(name = nil, num_classes = nil, &block)
         @block = Proc.new &block
-        @intervals = num_classes ? to_intervals(num_classes) : nil
+        @num_classes = num_classes
+        @intervals = num_classes && variable_container ? set_intervals : nil
         
         # names are used as variable names in R, so make sure there's no whitespace
         @name = name.gsub(/\s+/, '_') if name
@@ -97,9 +98,9 @@ module Glymour
       # Apply @block to each column value, and 
       # return a list of evenly divided intervals [x1, x2, ..., x(n_classes)]
       # So that x1 is the minimum, xn is the max
-      def to_intervals(num_classes)
+      def set_intervals
         step = (values.max - values.min)/(num_classes-1).to_f
-        (0..(num_classes-1)).map { |k| values.min + k*step }
+        @intervals = (0..(num_classes-1)).map { |k| values.min + k*step }
       end
       
       def value_at(row)
@@ -114,7 +115,7 @@ module Glymour
       # Gives the location of a column value within a finite set of interval values (i.e. gives discrete state after classing a continuous variable)
       def location_in_interval(row)
         intervals.each_with_index do |x, i|
-          return i if value_at(row) <= x
+          return i if @block.call(row) <= x
         end
 
         # Return -1 if value is not within intervals
@@ -163,7 +164,8 @@ module Glymour
       cartprod(*cond_values).each do |value|
         R.eval <<-EOF
           partial_table <- t[,,#{value.join(',')}]
-          chisq <- chisq.test(partial_table)
+          table_without_zero_columns <- partial_table[,-(which(colSums(partial_table) == 0))]
+          chisq <- chisq.test(table_without_zero_columns)
           s <- chisq$statistic
         EOF
         
@@ -273,6 +275,9 @@ module Glymour
               coindependent?(p_value, a, b, *subset)
             }
               @net = remove_edge(net, e)
+              net.edges.each do |e|
+                puts "#{e.source.name} => #{e.target.name}"
+              end
               any_independent = true
             end
           end
@@ -290,7 +295,7 @@ module Glymour
           puts "n = #{n}"
           final_net = net
           step
-        end while n < net.vertices.length - 1
+        end while n < 1
         
         net = final_net
         
@@ -339,7 +344,6 @@ module Glymour
           end
           
           compat_list << current_orientation if current_orientation.acyclic?
-          print "\n"
         end
         
         compat_list

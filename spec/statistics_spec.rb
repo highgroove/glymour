@@ -20,18 +20,19 @@ describe Glymour::Statistics do
   it 'should give conditional independence data for several variables' do
     Stats.coindependent?(0.05, @red, @blue, @h).should be_true
     Stats.coindependent?(0.05, @j, @m, @a).should be_true
+    Stats.coindependent?(0.05, @b, @ac, @a).should be_true
   end
   
   describe Glymour::Statistics::VariableContainer
     it 'should set variable name when nil' do
-      var = Glymour::Statistics::Variable.new([]) {|r| r}
+      var = Glymour::Statistics::Variable.new {|r| r}
       container = Glymour::Statistics::VariableContainer.new([], [var])
       var.name.should_not be_nil
     end
       
     it 'should create unique names for variables' do
-      var1 = Glymour::Statistics::Variable.new([]) {|r| r}
-      var2 = Glymour::Statistics::Variable.new([]) {|r| r}
+      var1 = Glymour::Statistics::Variable.new {|r| r}
+      var2 = Glymour::Statistics::Variable.new {|r| r}
       container = Glymour::Statistics::VariableContainer.new([], [var1, var2])
       var1.name.should_not eq var2.name
     end

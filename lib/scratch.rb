@@ -15,3 +15,9 @@ class WeightNet
     end
   end
 end
+
+R.eval <<-EOF
+  partial_table <- t[,,#{value.join(',')}]
+  chisq <- chisq.test(partial_table)
+  s <- chisq$statistic
+EOF

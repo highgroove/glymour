@@ -23,17 +23,22 @@ def alarm_init
   
     john_calls = alarm ? prob(0.90) : prob(0.05)
     mary_calls = alarm ? prob(0.70) : prob(0.01)
+    
+    alarm_continuous = rand(50)
   
-    @alarm_data << { :e => earthquake, :b => burglary, :a => alarm, :j => john_calls, :m => mary_calls }
+    @alarm_data << { :e => earthquake, :b => burglary, :a => alarm, :j => john_calls, :m => mary_calls, :ac => alarm_continuous }
   end
-  @e = Glymour::Statistics::Variable.new(@alarm_data, "Earthquake") { |r| r[:e] }
-  @b = Glymour::Statistics::Variable.new(@alarm_data, "Burglary") { |r| r[:b] }
-  @a = Glymour::Statistics::Variable.new(@alarm_data, "Alarm") { |r| r[:a] }
-  @j = Glymour::Statistics::Variable.new(@alarm_data, "John Calls") { |r| r[:j] }
-  @m = Glymour::Statistics::Variable.new(@alarm_data, "Mary Calls") { |r| r[:m] }
-  alarm_vars = [@e, @b, @a, @j, @m]
+  @e = Glymour::Statistics::Variable.new("Earthquake") { |r| r[:e] }
+  @b = Glymour::Statistics::Variable.new("Burglary") { |r| r[:b] }
+  @a = Glymour::Statistics::Variable.new("Alarm") { |r| r[:a] }
+  @j = Glymour::Statistics::Variable.new("John Calls") { |r| r[:j] }
+  @m = Glymour::Statistics::Variable.new("Mary Calls") { |r| r[:m] }
+  
+  @ac = Glymour::Statistics::Variable.new("Alarm Continuous", 10) { |r| r[:ac] }
+  
+  alarm_vars = [@e, @b, @a, @j, @m, @ac]
 
-  alarm_container = Glymour::Statistics::VariableContainer.new(@alarm_data, [@e, @b, @a, @j, @m])
+  alarm_container = Glymour::Statistics::VariableContainer.new(@alarm_data, alarm_vars)
   @alarm_net = Glymour::StructureLearning::LearningNet.new(alarm_container)
 end
 
@@ -48,9 +53,9 @@ def coin_init
     @coin_data << { :h => h, :red => red, :blue => blue }
   end
   
-  @h = Glymour::Statistics::Variable.new(@coin_data, "Heads") { |r| r[:h] }
-  @red = Glymour::Statistics::Variable.new(@coin_data, "Red") { |r| r[:red] }
-  @blue = Glymour::Statistics::Variable.new(@coin_data, "Blue") { |r| r[:blue] }
+  @h = Glymour::Statistics::Variable.new("Heads") { |r| r[:h] }
+  @red = Glymour::Statistics::Variable.new("Red") { |r| r[:red] }
+  @blue = Glymour::Statistics::Variable.new("Blue") { |r| r[:blue] }
   
   coin_container = Glymour::Statistics::VariableContainer.new(@coin_data, [@h, @red, @blue])
   @coin_net = Glymour::StructureLearning::LearningNet.new(coin_container)
